@@ -2,37 +2,28 @@
 
 namespace GaryClarke\Framework\Http;
 
-use FastRoute\RouteCollector;
-use function FastRoute\simpleDispatcher;
+use GaryClarke\Framework\Routing\Router;
 
 class Kernel
 {
-    public function handle(Request $request): Response
+    public function __construct(private Router $router)
     {
-
-        // create a dispatcher
-        $dispatcher = simpleDispatcher(function (RouteCollector $routeCollector) {
-
-            $routes = include BASE_PATH . '/routes/web.php';
-
-            foreach ($routes as $route) {
-                $routeCollector->addRoute(...$route);
-            }
-
-        });
-
-        // Dispatch a uri, to obtain route info
-        $routeInfo = $dispatcher->dispatch(
-            $request->getMethod(),
-            $request->getPathInfo()
-        );
-
-        [$status, [$controller, $method], $vars] = $routeInfo;
-
-        $response = call_user_func_array([new $controller(), $method], $vars);
-
-        // Call the handler, provided by the route info, in order to create a response
-        return $response;
     }
 
+    public function handle(Request $request): Response
+    {
+        try {
+
+            [$routeHandler, $vars] = $this->router->dispatch($request);
+
+            $response = call_user_func_array($routeHandler, $vars);
+
+        } catch (HttpException $exception) {
+            $response = new Response($exception->getMessage(), $exception->getStatusCode());
+        } catch (\Exception $exception) {
+            $response = new Response($exception->getMessage(), 500);
+        }
+
+        return $response;
+    }
 }
